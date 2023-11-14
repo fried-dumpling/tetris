@@ -5,6 +5,8 @@
 #include <windows.h>
 #include <conio.h>
 
+// 이 주석은 아빠가 추가한 주석
+
 typedef unsigned char u_char;
 
 void textColor(char colorNum) {
