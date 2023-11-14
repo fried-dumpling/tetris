@@ -5,8 +5,6 @@
 #include <windows.h>
 #include <conio.h>
 
-// 이 주석은 아빠가 추가한 주석
-
 typedef unsigned char u_char;
 
 void textColor(char colorNum) {
@@ -209,4 +207,13 @@ void printToGridDisplay(void) {
             GridDisplay[i][j][1] = Block[Grid[i][j]][3];
         }
     }
+}
+
+void printTetromino (char type) {
+    char grid[4][4] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+    char i;
+    for (i = 0; i < 4; i++) {
+        grid[Rotation[type][0][i][1]][Rotation[type][0][i][0]] = 1;
+    }
+    //Copy To Display(not print)
 }
