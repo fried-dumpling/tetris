@@ -15,8 +15,7 @@ void textColor(char colorNum) {
 //Dark Red, Dark Yellow, Yellow, Green, Sky Blue, Dark Blue, Dark Purple
 char BlockColor[7] = {4,6,14,10,11,1,5};
 
-//Null
-char Display[2] = {0,1};
+char Display[24][21][2];
 
 //char,col
 char GridDisplay[20][10][2];
@@ -29,17 +28,23 @@ char Block[221][4];
 u_char BlockId = 0;
 char Tetromino[7];
 
+u_char key[2] = {0,0};
+
+//up,down,left,right,drop,turnLeft,turnRight,hold,escape,select
+u_char keymap[10][2];
+
 //I,O,J,L,S,Z,T
 char Rotation[7][4][4][2] = {
-    {{{2,0},{1,0},{0,0},{-1,0}},{{0,2},{0,1},{0,0},{0,-1}},{{2,0},{1,0},{0,0},{-1,0}},{{0,2},{0,1},{0,0},{0,-1}}},
-    {{{-1,1},{0,1},{-1,0},{0,0}},{{-1,-1},{0,-1},{-1,0},{0,0}},{{-1,-1},{0,-1},{-1,0},{0,0}},{{-1,-1},{0,-1},{-1,0},{0,0}}},
-    {{{-1,0},{0,0},{1,0},{1,1}},{{0,1},{0,0},{-1,0},{0,-1}},{{-1,1},{-1,0},{0,0},{1,0}},{{0,1},{1,1},{0,0},{0,-1}}},
+    {{{-2,0},{-1,0},{0,0},{1,0}},{{0,2},{0,1},{0,0},{0,-1}},{{-2,0},{-1,0},{0,0},{1,0}},{{0,2},{0,1},{0,0},{0,-1}}},
+    {{{-1,1},{0,1},{-1,0},{0,0}},{{-1,1},{0,1},{-1,0},{0,0}},{{-1,1},{0,1},{-1,0},{0,0}},{{-1,1},{0,1},{-1,0},{0,0}}},
+    {{{-1,0},{0,0},{1,0},{1,-1}},{{0,1},{0,0},{-1,0},{0,-1}},{{-1,1},{-1,0},{0,0},{1,0}},{{0,1},{1,1},{0,0},{0,-1}}},
     {{{-1,0},{0,0},{1,0},{-1,-1}},{{-1,-1},{0,1},{0,0},{0,-1}},{{ 1,-1},{-1,0},{0,0},{1,0}},{{0,1},{0,0},{0,-1},{1,-1}}},
     {{{0,0},{1,0},{-1,-1},{0,-1}},{{0,1},{0,0},{1,0},{1,-1}},{{0,0},{1,0},{-1,-1},{0,-1}},{{0,1},{0,0},{1,0},{1,-1}}},
     {{{-1,0},{0,0},{0,-1},{1,-1}},{{1,1},{0,0},{1,0},{0,-1}},{{-1,0},{0,0},{0,-1},{1,-1}},{{1,1},{0,0},{1,0},{0,-1}}},
     {{{-1,0},{0,0},{1,0},{0,-1}},{{0,1},{-1,0},{0,0},{0,-1}},{{0,1},{-1,0},{0,0},{1,0}},{{0,-1},{0,0},{1,0},{0,-1}}}
 };
 
+void resetDisplay(void);
 void resetGridDisplay(void);
 void resetGrid(void);
 void resetBlock(void);
@@ -48,31 +53,42 @@ void deleteBlock(u_char);
 void resetTetromino(void);
 void createTetromino(char,char,char);
 void fallTetromino(void);
-void moveTetromino(char,char);char isTetrominoAtWall(void);
+void moveTetromino(char,char);
+char isTetrominoAtWall(void);
 char isTetrominoAtBottom(void);
 void printToGridDisplay(void);
+void printGame(char,char,char,char,char);
+void printDisplay(void);
 
 int main() {
     srand(time(NULL));
-    resetGridDisplay();
-    resetGrid();
-    resetBlock();
-    resetTetromino();
-    char i;
-    char j;
-    createTetromino(10,5,3);
+}
+
+void mainGame(void) {
+    char score = 0;
+    char nextBlock = rand()%7;
+    char nextCol = rand()%7;
+    char holdBlock = 0;
+    char holdCol = 0;
+    createTetromino(rand()%7,rand()%7,0);
     while (1) {
+        nextBlock = rand()%7;
+        nextCol = rand()%7;
         fallTetromino();
         printToGridDisplay();
-        for (i = 19; i > -1; i--) {
-            for (j = 0; j < 10; j++) {
-                textColor(GridDisplay[i][j][1]);
-                printf("%c",GridDisplay[i][j][0]);
-            }
-            printf("\n");
+        printGame(nextBlock,nextCol,score,holdBlock,holdCol);
+        printDisplay();
+    }
+}
+
+void resetDisplay(void) {
+    char i;
+    char j;
+    for (i = 0; i < 24; i++) {
+        for (j = 0; j < 21; j++) {
+            Display[i][j][0] = ' ';
+            Display[i][j][1] = 15;
         }
-        printf("__________________\n");
-        Sleep(1000);
     }
 }
 
@@ -147,7 +163,7 @@ void createTetromino(char col,char type,char rotation) {
     char i;
     Tetromino[0] = 1;
     for (i = 0; i < 4; i++) {
-        createBlock(6+(Rotation[type][rotation][i][0]),21+(Rotation[type][rotation][i][1]),col);
+        createBlock(6+(Rotation[type][rotation][i][0]),21+(Rotation[type][rotation][i][1]),BlockColor[col]);
         Tetromino[i+1] = BlockId;
     }
     Tetromino[5] = type;
@@ -209,11 +225,104 @@ void printToGridDisplay(void) {
     }
 }
 
-void printTetromino (char type) {
-    char grid[4][4] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+void printGame(char nextType,char nextCol,char score,char hold,char holdCol) {
     char i;
-    for (i = 0; i < 4; i++) {
-        grid[Rotation[type][0][i][1]][Rotation[type][0][i][0]] = 1;
+    char j;
+    char text1[6] = "Tetris";
+    char text2[5] = "score";
+    char text3[4] = "next";
+    char text4[4] = "hold";
+    for (i = 0; i < 6; i++) {
+        Display[0][i+2][0] = text1[i];
+        Display[0][i+2][1] = 15;
     }
-    //Copy To Display(not print)
+    for (i = 2; i < 24; i++) {
+        for (j = 0; j < 12; j++) {
+            if ((i == 2)||(i == 23)||(j == 0)||(j == 11)) {
+                Display[i][j][0] = '%';
+                Display[i][j][1] = 15;
+            }
+        }
+    }
+    for (i = 0; i < 20; i++) {
+        for (j = 0; j < 10; j++) {
+            Display[i+3][j+1][0] = GridDisplay[19-i][j][0];
+            Display[i+3][j+1][1] = GridDisplay[19-i][j][1];
+        }
+    }
+    for (i = 0; i < 5; i++) {
+        Display[2][i+14][0] = text2[i];
+        Display[2][i+14][1] = 15;
+    }
+    char scoreC[6] = {0,0,0,0,0,0};
+    scoreC[0] = score%1000000/100000;
+    scoreC[1] = score%100000/10000;
+    scoreC[2] = score%10000/1000;
+    scoreC[3] = score%1000/100;
+    scoreC[4] = score%100/10;
+    scoreC[5] = score%10;
+    for (i = 0; i < 6; i++) {
+        Display[3][i+14][0] = scoreC[i]+48;
+        Display[3][i+14][1] = 15;
+    }
+    for (i = 0; i < 4; i++) {
+        Display[5][i+15][0] = text3[i];
+        Display[5][i+15][1] = 15;
+    }
+    for (i = 6; i < 12; i++) {
+        for (j = 14; j < 20; j++) {
+            if ((i == 6)||(i == 11)||(j == 14)||(j == 19)) {
+                Display[i][j][0] = '%';
+                Display[i][j][1] = 15;
+            }
+        }
+    }
+    for (i = 0; i < 4; i++) {
+        Display[-Rotation[nextType][0][i][1]+9][Rotation[nextType][0][i][0]+17][0] = '#';
+        Display[-Rotation[nextType][0][i][1]+9][Rotation[nextType][0][i][0]+17][1] = BlockColor[nextCol];
+    }
+    for (i = 0; i < 4; i++) {
+        Display[14][i+15][0] = text4[i];
+        Display[14][i+15][1] = 15;
+    }
+    for (i = 15; i < 21; i++) {
+        for (j = 14; j < 20; j++) {
+            if ((i == 6)||(i == 11)||(j == 14)||(j == 19)) {
+                Display[i][j][0] = '%';
+                Display[i][j][1] = 15;
+            }
+        }
+    }
+    if (hold != 0) {
+        for (i = 0; i < 4; i++) {
+            Display[-Rotation[hold-1][0][i][1]+9][Rotation[hold-1][0][i][0]+17][0] = '#';
+            Display[-Rotation[hold-1][0][i][1]+9][Rotation[hold-1][0][i][0]+17][1] = BlockColor[holdCol];
+        }
+    }
+}
+
+void updateKeymap(void) {
+}
+
+void updateKey(void) {
+    key[0] = 0;
+    key[1] = 0;
+    key[0] = getch();
+    if ((key[0] == 0)||(key[0] == 224))
+        key[1] = getch();
+}
+
+void printMainscreen(void) {
+}
+
+void printDisplay(void) {
+    char x;
+    char y;
+    //cls
+    for(y = 0; y < 24; y++) {
+        for (x = 0; x < 21; x++) {
+            printf("%c",Display[y][x]);
+        }
+        printf("\n");
+    }
 }
