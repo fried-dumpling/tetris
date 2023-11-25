@@ -21,26 +21,21 @@ void textColor(char colorNum) {
 }
 
 //Dark Red, Dark Yellow, Yellow, Green, Sky Blue, Dark Blue, Dark Purple
-char BlockColor[7] = {4,6,14,10,11,1,5};
+const char BlockColor[7] = {4,6,14,10,11,1,5};
 
 char Display[24][21][2];
-
 //char,col
 char GridDisplay[20][10][2];
-
 u_char Grid[40][10];
 
 //is,x,y,col
 char Block[221][4];
-
 u_char BlockId = 0;
-char Tetromino[7];
+u_char Tetromino[8];
 
 u_char key[2] = {0,0};
-
 //up,down,left,right,drop,turnClock,turnCounterClock,hold,escape,select
 u_char keymap[10][2] = {{224,72},{224,80},{224,75},{224,77},{224,80},{224,72},{122,0},{99,0},{27,0},{13,0}};
-
 char isKeyKeymap(char keymapNum) {
     char ret = 0;
     if (key[0] == keymap[keymapNum][0]&&key[1] == keymap[keymapNum][1])
@@ -49,14 +44,14 @@ char isKeyKeymap(char keymapNum) {
 }
 
 //I,O,J,L,S,Z,T
-char Rotation[7][4][4][2] = {
+const char Rotation[7][4][4][2] = {
     {{{-2,0},{-1,0},{0,0},{1,0}},{{0,2},{0,1},{0,0},{0,-1}},{{-2,0},{-1,0},{0,0},{1,0}},{{0,2},{0,1},{0,0},{0,-1}}},
     {{{-1,1},{0,1},{-1,0},{0,0}},{{-1,1},{0,1},{-1,0},{0,0}},{{-1,1},{0,1},{-1,0},{0,0}},{{-1,1},{0,1},{-1,0},{0,0}}},
-    {{{-1,0},{0,0},{1,0},{1,-1}},{{0,1},{0,0},{-1,0},{0,-1}},{{-1,1},{-1,0},{0,0},{1,0}},{{0,1},{1,1},{0,0},{0,-1}}},
-    {{{-1,0},{0,0},{1,0},{-1,-1}},{{-1,-1},{0,1},{0,0},{0,-1}},{{ 1,-1},{-1,0},{0,0},{1,0}},{{0,1},{0,0},{0,-1},{1,-1}}},
+    {{{-1,0},{0,0},{1,0},{1,-1}},{{0,1},{0,0},{-1,-1},{0,-1}},{{-1,0},{-1,1},{0,0},{1,0}},{{0,1},{1,1},{0,0},{0,-1}}},
+    {{{-1,0},{0,0},{1,0},{-1,-1}},{{-1,1},{0,1},{0,0},{0,-1}},{{1,1},{-1,0},{0,0},{1,0}},{{0,1},{0,0},{0,-1},{1,-1}}},
     {{{0,0},{1,0},{-1,-1},{0,-1}},{{0,1},{0,0},{1,0},{1,-1}},{{0,0},{1,0},{-1,-1},{0,-1}},{{0,1},{0,0},{1,0},{1,-1}}},
     {{{-1,0},{0,0},{0,-1},{1,-1}},{{1,1},{0,0},{1,0},{0,-1}},{{-1,0},{0,0},{0,-1},{1,-1}},{{1,1},{0,0},{1,0},{0,-1}}},
-    {{{-1,0},{0,0},{1,0},{0,-1}},{{0,1},{-1,0},{0,0},{0,-1}},{{0,1},{-1,0},{0,0},{1,0}},{{0,-1},{0,0},{1,0},{0,-1}}}
+    {{{-1,0},{0,0},{1,0},{0,-1}},{{0,1},{-1,0},{0,0},{0,-1}},{{0,1},{-1,0},{0,0},{1,0}},{{0,1},{0,0},{1,0},{0,-1}}}
 };
 
 void resetDisplay(void);
@@ -66,13 +61,18 @@ void resetBlock(void);
 void createBlock(char,char,char);
 void deleteBlock(u_char);
 void resetTetromino(void);
+void deleteTetromino(void);
 void createTetromino(char,char,char);
 void fallTetromino(void);
-void moveTetromino(char,char);
+void moveTetromino(char);
+void rotateTetromino(char);
+char canTetrominoRotate(char);
 char isTetrominoAtWall(void);
 char isTetrominoAtBottom(void);
+char clearRow(void);
+void compressRow(void);
 void printToGridDisplay(void);
-void printGame(char,char,char,char,char);
+void printGame(char,char,char,char,char,char);
 void printDisplay(void);
 void printMainScreen(char);
 void printEscapeScreen(char);
@@ -100,6 +100,7 @@ int main() {
         select %= 4;
         printMainScreen(select);
         system("cls");
+        //printf("\e[1;1H\e[2J");
         printDisplay();
         Sleep(100);
         if (select == 1&&isKeyKeymap(9)) {
@@ -112,22 +113,100 @@ int main() {
 }
 
 void mainGame(void) {
+    char i;
     resetDisplay();
     char score = 0;
     char nextBlock = 0;
     char nextCol = 0;
-    char holdBlock = 5;
-    char holdCol = 5;
+    char holdBlock = 0;
+    char holdCol = 0;
+    char holdRot = 0;
+    char holdBlockT = 0;
+    char holdColT = 0;
+    char holdRotT = 0;
+    char holded = 0;
+    char fall = 0;
+    char fallspeed = 10;
+    char cancelMul = 3;
     createTetromino(rand()%7,rand()%7,0);
+    char moveDir = 0;
+    char bottomTime = 0;
     while (1) {
-        nextBlock = rand()%7;
-        nextCol = rand()%7;
-        fallTetromino();
+        resetKey();
+        updateKey();
+        if (fall==0 && isKeyKeymap(4)==0 && isTetrominoAtBottom()==0) {
+            fallTetromino();
+        }
+        if (isKeyKeymap(4) && isTetrominoAtBottom()==0) {
+            fallTetromino();
+            fall = 1;
+        }
+        if (isKeyKeymap(2) && (isTetrominoAtWall()!=1)) {
+            moveTetromino(-1);
+            fall = (fall-(fallspeed/cancelMul) > 0)*(fall-(fallspeed/cancelMul)-1)+1;
+            resetKey();
+        }
+        if (isKeyKeymap(3) && (isTetrominoAtWall()!=2)) {
+            moveTetromino(1);
+            fall = (fall-(fallspeed/cancelMul) > 0)*(fall-(fallspeed/cancelMul)-1)+1;
+            resetKey();
+        }
+        if (isKeyKeymap(5)) {
+            if (canTetrominoRotate(1)) {
+                rotateTetromino(1);
+                fall = (fall-(fallspeed/cancelMul) > 0)*(fall-(fallspeed/cancelMul)-1)+1;
+            }
+            resetKey();
+        }
+        if (isKeyKeymap(6)) {
+            if (canTetrominoRotate(3)) {
+                rotateTetromino(3);
+                fall = (fall-(fallspeed/cancelMul) > 0)*(fall-(fallspeed/cancelMul)-1)+1;
+            }
+            resetKey();
+        }
+        if (isKeyKeymap(7)) {
+            if (holded == 0) {
+                holdBlockT = Tetromino[5]+1;
+                holdRotT = Tetromino[6];
+                for (i = 0; i < 7; i++) {
+                    if (BlockColor[i] == Block[Tetromino[1]][3])
+                        holdColT = i;
+                }
+                deleteTetromino();
+                if (holdBlock != 0) {
+                    createTetromino(holdCol,holdBlock-1,holdRot);
+                }
+                holdBlock = holdBlockT;
+                holdCol = holdColT;
+                holdRot = holdRotT;
+                holded = 1;
+            }   
+        }
+        if (isTetrominoAtBottom()) {
+            bottomTime++;
+        }
+        else {
+            bottomTime = 0;
+        }
+        if (bottomTime >= fallspeed) {
+            resetTetromino();
+            holded = 0;
+            score += clearRow();
+            compressRow();
+            createTetromino(nextCol,nextBlock,0);
+            nextBlock = rand()%7;
+            nextCol = rand()%7;
+            bottomTime = 0;
+        }
         printToGridDisplay();
-        printGame(nextBlock,nextCol,score,holdBlock,holdCol);
+        printGame(nextBlock,nextCol,score,holdBlock,holdCol,holdRot);
         system("cls");
+        //printf("\e[1;1H\e[2J");
         printDisplay();
-        Sleep(100);
+        Sleep(17);
+        fall++;
+        fall %= fallspeed;
     }
 }
 
@@ -190,6 +269,14 @@ void resetTetromino(void) {
     Tetromino[4] = 0;
     Tetromino[5] = 0;
     Tetromino[6] = 0;
+    Tetromino[7] = 1;
+}
+
+void deleteTetromino(void) {
+    char i;
+    for (i = 1; i < 5; i++) {
+        deleteBlock(Tetromino[i]);
+    }
 }
 
 void createBlock(char x,char y,char col) {
@@ -215,6 +302,8 @@ void createTetromino(char col,char type,char rotation) {
     for (i = 0; i < 4; i++) {
         createBlock(6+(Rotation[type][rotation][i][0]),21+(Rotation[type][rotation][i][1]),BlockColor[col]);
         Tetromino[i+1] = BlockId;
+        if (Rotation[type][rotation][i][0] == 0 && Rotation[type][rotation][i][1] == 0)
+            Tetromino[7] = i+1;
     }
     Tetromino[5] = type;
     Tetromino[6] = rotation;
@@ -228,22 +317,75 @@ void fallTetromino(void) {
     updateGrid();
 }
 
-void moveTetromino(char rotation,char direction) {
+void moveTetromino(char direction) {
     char i;
     for (i = 0; i < 4; i++) {
-        Block[Tetromino[i+1]][1] = Rotation[Tetromino[5]][(Tetromino[6]+rotation)%4][i][0];
-        Block[Tetromino[i+1]][2] = Rotation[Tetromino[5]][(Tetromino[6]+rotation)%4][i][1];
         Block[Tetromino[i+1]][1] += direction;
     }
     updateGrid();
 }
 
+void rotateTetromino(char rotation) {
+    char i;
+    char tempX = 0;
+    char tempY = 0;
+    tempX = Block[Tetromino[Tetromino[7]]][1];
+    tempY = Block[Tetromino[Tetromino[7]]][2];
+    for (i = 0; i < 4; i++) {
+        Block[Tetromino[i+1]][1] = Rotation[Tetromino[5]][(Tetromino[6]+rotation)%4][i][0]+tempX;
+        printf("%d\n",Rotation[Tetromino[5]][(Tetromino[6]+rotation)%4][i][0]);
+        Block[Tetromino[i+1]][2] = Rotation[Tetromino[5]][(Tetromino[6]+rotation)%4][i][1]+tempY;
+        printf("%d\n",Rotation[Tetromino[5]][(Tetromino[6]+rotation)%4][i][1]);
+        if (Rotation[Tetromino[5]][(Tetromino[6]+rotation)%4][i][0] == 0 && Rotation[Tetromino[5]][(Tetromino[6]+rotation)%4][i][1] == 0)
+            Tetromino[7] = i+1;
+    }
+    Tetromino[6] = (Tetromino[6]+rotation)%4;
+    updateGrid();
+}
+
+char canTetrominoRotate(char rotation) {
+    char i;
+    char x = 0;
+    char y = 0;
+    char ret = 1;
+    for (i = 0; i < 4; i++) {
+        x = Rotation[Tetromino[5]][(Tetromino[6]+rotation)%4][i][0]+Block[Tetromino[Tetromino[7]]][1];
+        y = Rotation[Tetromino[5]][(Tetromino[6]+rotation)%4][i][1]+Block[Tetromino[Tetromino[7]]][2];
+        if (0>x||x>9 || 0>y)
+            ret = 0;
+    }
+    return ret;
+}
+
 char isTetrominoAtWall(void) {
     char ret = 0;
     char i;
+    char j;
+    char or = 0;
     for (i = 1; i < 5; i++) {
-        if ((Block[Tetromino[i]][1] == 0)||(Block[Tetromino[i]][1] == 9)) {
+        or = 1;
+        if ((Block[Tetromino[i]][1] == 0)) {
             ret = 1;
+        }
+        else {
+            for (j = 1; j < 5; j++) {
+                if (Grid[Block[Tetromino[i]][2]][Block[Tetromino[i]][1]-1] == Tetromino[j])
+                    or = 0;
+            }
+            if (or && Block[Grid[Block[Tetromino[i]][2]][Block[Tetromino[i]][1]-1]][0])
+                ret = 1;
+        }
+        or = 1;
+        if ((Block[Tetromino[i]][1] == 9)) {
+            ret = 2;
+        }
+        else {
+            for (j = 1; j < 5; j++) {
+                if (Grid[Block[Tetromino[i]][2]][Block[Tetromino[i]][1]+1] == Tetromino[j])
+                    or = 0;
+            }
+            if (or && Block[Grid[Block[Tetromino[i]][2]][Block[Tetromino[i]][1]+1]][0])
+                ret = 2;
         }
     }
     return ret;
@@ -251,17 +393,63 @@ char isTetrominoAtWall(void) {
 
 char isTetrominoAtBottom(void) {
     char ret = 0;
+    char or = 0;
     char i;
     char j;
     for (i = 1; i < 5; i++) {
+        or = 1;
         if (Block[Tetromino[i]][2] == 0)
             ret = 1;
         for (j = 1; j < 5; j++) {
-            if (Grid[Block[Tetromino[i]][2]-1][Block[Tetromino[i]][1]] != Tetromino[j])
-                ret = 1;
+            if (Grid[Block[Tetromino[i]][2]-1][Block[Tetromino[i]][1]] == Tetromino[j])
+                or = 0;
         }
+        if (or && Block[Grid[Block[Tetromino[i]][2]-1][Block[Tetromino[i]][1]]][0])
+            ret = 1;
     }
     return ret;
+}
+
+char clearRow(void) {
+    char i;
+    char j;
+    char lineBlock = 0;
+    char line = 0;
+    for (i = 0; i < 40; i++) {
+        lineBlock = 0;
+        for (j = 0; j < 10; j++) {
+            lineBlock += Block[Grid[i][j]][0];
+        }
+        if (lineBlock == 10) {
+            for (j = 0; j < 10; j++) {
+                deleteBlock(Grid[i][j]);
+            }
+            line++;
+        }
+    }
+    return line;
+}
+
+void compressRow(void) {
+    char i;
+    char j;
+    char k;
+    char l;
+    char lineBlock = 0;
+    for (i = 39; i >= 0; i--) {
+        lineBlock = 0;
+        for (j = 0; j < 10; j++) {
+            lineBlock += Block[Grid[i][j]][0];
+        }
+        if (lineBlock == 0) {
+            for (k = i+1; k < 40; k++) {
+                for (l = 0; l < 10; l++) {
+                    Block[Grid[k][l]][2]--;
+                }
+            }
+        }
+    }
+    updateGrid();
 }
 
 void printToGridDisplay(void) {
@@ -275,7 +463,7 @@ void printToGridDisplay(void) {
     }
 }
 
-void printGame(char nextType,char nextCol,char score,char hold,char holdCol) {
+void printGame(char nextType,char nextCol,char score,char hold,char holdCol,char holdRot) {
     char i;
     char j;
     char text1[6] = "Tetris";
@@ -349,17 +537,16 @@ void printGame(char nextType,char nextCol,char score,char hold,char holdCol) {
             }
         }
     }
-    //not made y coord not right
     for (i = 0; i < 4; i++) {
         for (j = 0; j < 4; j++) {
-            Display[i+7][j+15][0] = ' ';
-            Display[i+7][j+15][1] = 15;
+            Display[i+16][j+15][0] = ' ';
+            Display[i+16][j+15][1] = 15;
         }
     }
     if (hold != 0) {
         for (i = 0; i < 4; i++) {
-            Display[-Rotation[hold-1][0][i][1]+9][Rotation[hold-1][0][i][0]+17][0] = '#';
-            Display[-Rotation[hold-1][0][i][1]+9][Rotation[hold-1][0][i][0]+17][1] = BlockColor[holdCol];
+            Display[-Rotation[hold-1][holdRot][i][1]+18][Rotation[hold-1][holdRot][i][0]+17][0] = '#';
+            Display[-Rotation[hold-1][holdRot][i][1]+18][Rotation[hold-1][holdRot][i][0]+17][1] = BlockColor[holdCol];
         }
     }
 }
